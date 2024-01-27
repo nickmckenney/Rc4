@@ -4,7 +4,7 @@ unsigned char shellcode[] = {
 	"THIS IS SHELLCODE!!!"
 };
 unsigned char key[] = {
-	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
+0x4F, 0x2E, 0x8B, 0x7D, 0x1C, 0x6F, 0x03, 0x5A, 0x98, 0xB2, 0xE7, 0xD4, 0xF1, 0xC6, 0x03, 0x9A
 };
 //I used this for help to create my RC4 -> https://oryx-embedded.com/doc/rc4_8h_source.html#l00050
 typedef struct
@@ -33,8 +33,6 @@ void Rc4Encryption(Rc4Context* rc4Context, const unsigned char* input, unsigned 
 	unsigned int i = rc4Context->i;
 	unsigned int j = rc4Context->j;
 	unsigned char* s = rc4Context->s;
-	//printf("Rc4Encryption");
-	//printf("%d ", rc4Context->s);
 	while (length > 0) {
 		j = (i + 1) % 256;
 		j = (j + s[i]) % 256;
@@ -43,41 +41,58 @@ void Rc4Encryption(Rc4Context* rc4Context, const unsigned char* input, unsigned 
 		s[j] = temp;
 		if (input != NULL && output != NULL) {
 			*output = *input ^ s[(s[i] + s[j]) % 256];
-			input++, output++;
+			input++;
+			output++;
 
 		}
 		length--;
 	}
 	rc4Context->i = i;
 	rc4Context->j = j;
-	//printf("%d ", rc4Context);
 }
+
 void main(){
 	Rc4Context ctx = { 0 };
 	//ctx is the rc4context with a key
-	Rc4CreateKey(&ctx, key, sizeof(key));
-	SIZE_T lenShell = strlen(shellcode) * sizeof(int);
-	LPVOID pStartAddress = (unsigned char*)VirtualAlloc(
-		NULL, 
-		strlen(shellcode) * sizeof(int), 
-		MEM_COMMIT | MEM_RESERVE, 
+	Rc4CreateKey(&ctx, key, sizeof(key)); //Creates key
+	LPVOID pStartAddressOfCipher = (unsigned char*)VirtualAlloc(
+		NULL,
+		strlen(shellcode),
+		MEM_COMMIT | MEM_RESERVE,
 		PAGE_EXECUTE_READWRITE
 	);
+	RtlMoveMemory(pStartAddressOfCipher, shellcode, strlen(shellcode));
 	BOOL bRemoveSwap = VirtualLock(
-		pStartAddress,
-		lenShell
+		pStartAddressOfCipher,
+		strlen(shellcode)
+	); if (!bRemoveSwap) { return 1; }
+	//My Encryption--------------------------
+	SecureZeroMemory(pStartAddressOfCipher, strlen(shellcode) * sizeof(int));
+	Rc4Encryption(&ctx, shellcode, pStartAddressOfCipher, strlen(shellcode));
+	
+	//RtlMoveMemory(pStartAddressOfCipher, (char*)pStartAddressOfCipher, lenEncryptShell);
+	printf("CipherText : \"%s\" \n", (char*)pStartAddressOfCipher);
+	printf("-----------------------");
+	getchar();
+	//My END OF Encryption------------------------------
+	// 
+	Rc4CreateKey(&ctx, key, sizeof(key)); //Creates key
+	//My Decryption
+	LPVOID PlainText = (unsigned char*)VirtualAlloc(
+		NULL,
+		strlen(shellcode),
+		MEM_COMMIT | MEM_RESERVE,
+		PAGE_EXECUTE_READWRITE
 	);
-	if (!bRemoveSwap) {
-		return 1;
-	}
-	SecureZeroMemory(pStartAddress, lenShell);
-	printf("0x%p \n", pStartAddress);
-	printf("[i] PlainText : \"%s\" \n", (char*)pStartAddress);
-	BOOL bBringBackSwap = VirtualUnlock(bRemoveSwap, lenShell);
+	SecureZeroMemory(PlainText, strlen(shellcode) * sizeof(int));
+	Rc4Encryption(&ctx, pStartAddressOfCipher,PlainText, strlen(shellcode));
+	printf("[i] PlainText : \"%s\" \n", (char*)PlainText);
+	RtlMoveMemory(pStartAddressOfCipher, (char*)PlainText, strlen(shellcode));
+	//Frees -----------------------------------------------
+	
+	BOOL bBringBackSwap = VirtualUnlock(bRemoveSwap, strlen(shellcode));
 	if (!bBringBackSwap) {
 		return 1;
 	}
-
-
-	BOOL bReleaseDaMemory  = VirtualFree(pStartAddress, lenShell, MEM_RELEASE);
-}
+	BOOL bReleaseDaMemory  = VirtualFree(pStartAddressOfCipher, strlen(shellcode), MEM_RELEASE);
+	}
