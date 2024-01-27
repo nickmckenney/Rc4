@@ -1,7 +1,7 @@
 #include <Windows.h>
 #include <stdio.h>
 unsigned char shellcode[] = {
-	"THIS IS SHELLCODE!"
+	"THIS IS SHELLCODE!!!"
 };
 unsigned char key[] = {
 	0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x0E, 0x0F
@@ -17,25 +17,16 @@ void Rc4CreateKey(Rc4Context* rc4Context, const unsigned int* key,size_t length)
 	unsigned int i, j;
 	unsigned char temp;
 	rc4Context->i, j = 0;
-
 	for (i = 0; i < 256; i++) {
 		rc4Context->s[i] = i;
-	
-
-		
 	}
-	
 	for (i = 0, j = 0; i < 256; i++) {
 		j = j + rc4Context->s[i] + key[i%length];
 		j = j % 256;
-
 		temp = rc4Context->s[i];
 		rc4Context->s[i] = rc4Context->s[j];
 		rc4Context->s[j] = temp;
-		
 	}
-	
-
 }
 void Rc4Encryption(Rc4Context* rc4Context, const unsigned char* input, unsigned char* output, size_t length) {
 	unsigned char temp;
